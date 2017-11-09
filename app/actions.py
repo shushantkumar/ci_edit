@@ -61,7 +61,15 @@ class Actions(app.mutator.Mutator):
           self.swapPenAndMarker()
         self.redoAddChange(('ds', text))
         self.redo()
+        if self.penRow >= len(self.lines):
+          self.cursorMove(len(self.lines) - self.penRow - 1, 0)
+          self.redo()
+        lastLineLen = len(self.lines[-1])
+        if self.penRow == len(self.lines) - 1 and self.penCol >= lastLineLen:
+          self.cursorMove(0, lastLineLen - self.penCol - 1)
+          self.redo()
       self.selectionNone()
+      #self.updateBasicScrollPosition()
 
   def performDeleteRange(self, upperRow, upperCol, lowerRow, lowerCol):
     app.log.info(upperRow, upperCol, lowerRow, lowerCol)
@@ -321,8 +329,7 @@ class Actions(app.mutator.Mutator):
   def cursorMoveScroll(self, rowDelta, colDelta,
       scrollRowDelta, scrollColDelta):
     self.updateScrollPosition(scrollRowDelta, scrollColDelta)
-    self.redoAddChange(('m', (rowDelta, colDelta,
-        0,0, 0)))
+    self.redoAddChange(('m', (rowDelta, colDelta, 0, 0, 0)))
 
   def cursorMoveDown(self):
     if self.penRow + 1 < len(self.lines):
@@ -483,6 +490,7 @@ class Actions(app.mutator.Mutator):
     self.redo()
 
   def cursorEndOfLine(self):
+    app.log.info()
     lineLen = len(self.lines[self.penRow])
     self.cursorMove(0, lineLen - self.penCol)
     self.redo()
@@ -492,6 +500,7 @@ class Actions(app.mutator.Mutator):
     self.cursorStartOfLine()
 
   def cursorSelectToEndOfLine(self):
+    app.log.info()
     self.selectionCharacter()
     self.cursorEndOfLine()
 
@@ -1241,7 +1250,15 @@ class Actions(app.mutator.Mutator):
     app.log.info(' mouse release', paneRow, paneCol)
     if not self.lines:
       return
-    row = max(0, min(self.view.scrollRow + paneRow, len(self.lines) - 1))
+    virtualRow = self.view.scrollRow + paneRow
+    if virtualRow >= len(self.lines):
+      # Off the bottom of document.
+      lastLine = len(self.lines) - 1
+      self.cursorMove(lastLine - self.penRow,
+          len(self.lines[lastLine]) - self.penCol)
+      self.redo()
+      return
+    row = max(0, min(virtualRow, len(self.lines)))
     col = max(0, self.view.scrollCol + paneCol)
     if self.selectionMode == app.selectable.kSelectionBlock:
       self.cursorMoveAndMark(0, 0, row - self.markerRow, col - self.markerCol,
@@ -1291,10 +1308,10 @@ class Actions(app.mutator.Mutator):
     app.log.info('triple click', paneRow, paneCol)
     self.mouseRelease(paneRow, paneCol, shift, ctrl, alt)
     self.selectLineAt(self.view.scrollRow + paneRow)
+    self.selectionLine()
 
   def scrollWindow(self, rows, cols):
-    self.cursorMoveScroll(rows, self.cursorColDelta(self.penRow - rows),
-        -1, 0)
+    self.cursorMoveScroll(rows, self.cursorColDelta(self.penRow - rows), -1, 0)
     self.redo()
 
   def mouseWheelDown(self, shift, ctrl, alt):
@@ -1383,11 +1400,19 @@ class Actions(app.mutator.Mutator):
       This function is used to select the line in which the cursor is in.
       Consecutive calls to this function will select subsequent lines.
     """
-    if self.selectionMode != app.selectable.kSelectionLine:
+    #upperRow, upperCol, lowerRow, lowerCol = self.startAndEnd()
+    #lineSelected = upperCol == 0 and lowerCol == 0
+    lineSelected = self.markerCol == 0 and self.penCol == 0
+    if not lineSelected:
+      app.log.info()
       self.selectLineAt(self.penRow)
     else:
       if self.penRow + 1 < len(self.lines):
-        self.selectLineAt(self.penRow + 1)
+        app.log.info()
+        self.cursorSelectDown()
+      else:
+        app.log.info()
+        self.cursorSelectToEndOfLine()
 
   def selectionAll(self):
     self.doSelectionMode(app.selectable.kSelectionAll)
@@ -1410,6 +1435,16 @@ class Actions(app.mutator.Mutator):
     self.doSelectionMode(app.selectable.kSelectionWord)
 
   def selectLineAt(self, row):
+    if row + 1 < len(self.lines):
+      app.log.info()
+      self.cursorMoveAndMark(row + 1 - self.penRow, -self.penCol,
+          row - self.markerRow, -self.markerCol,
+          app.selectable.kSelectionCharacter - self.selectionMode)
+      self.redo()
+    else:
+      app.log.info()
+
+  def old____selectLineAt(self, row):
     if row < len(self.lines):
       if 1:
         self.cursorMove(row - self.penRow, 0)
@@ -1421,6 +1456,13 @@ class Actions(app.mutator.Mutator):
         # TODO(dschuyler): reverted to above to fix line selection in the line
         # numbers column. To be investigated further.
         self.selectText(row, 0, 0, app.selectable.kSelectionLine)
+
+  def selectAllCharsAt(self, row):
+    if row < len(self.lines):
+      self.cursorMoveAndMark(row + 1 - self.penRow, -self.penCol,
+          row - self.markerRow, -self.markerCol,
+          app.selectable.kSelectionCharacter - self.selectionMode)
+      self.redo()
 
   def selectWordAt(self, row, col):
     """row and col may be from a mouse click and may not actually land in the
@@ -1439,6 +1481,7 @@ class Actions(app.mutator.Mutator):
     self.updateBasicScrollPosition()
 
   def swapPenAndMarker(self):
+    app.log.caller()
     self.cursorMoveAndMark(self.markerRow - self.penRow,
         self.markerCol - self.penCol,
         self.penRow - self.markerRow,

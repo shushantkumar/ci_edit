@@ -331,7 +331,7 @@ class Mutator(app.selectable.Selectable):
     """
     newTrivialChange = False
     if self.debugRedo:
-      app.log.info('redoAddChange', change)
+      app.log.caller('redoAddChange', change)
     # When the redoChain is trimmed we may lose the saved at.
     # Trim only when there is a non-trivial action.
     # A trivial change is a standalone cursor move.
@@ -402,10 +402,10 @@ class Mutator(app.selectable.Selectable):
       self.__undoMove(self.tempChange)
       self.tempChange = None
     while self.redoIndex > 0:
-      if self.debugRedo:
-        app.log.info('undo', self.redoIndex, repr(changes))
       self.redoIndex -= 1
       changes = self.redoChain[self.redoIndex]
+      if self.debugRedo:
+        app.log.info('undo', self.redoIndex, repr(changes))
       if changes[0][0] == 'm' and len(changes) == 1:
         # Undo if the last edit was a cursor move.
         self.__undoChange(changes[0])
@@ -482,6 +482,7 @@ class Mutator(app.selectable.Selectable):
     elif change[0] == 'n':
       # Undo split lines.
       self.__undoMove(change[2])
+      app.log.info(self.penRow, change[1], len(self.lines))
       self.lines[self.penRow] += self.lines[self.penRow + change[1]]
       for _ in range(change[1]):
         del self.lines[self.penRow + 1]

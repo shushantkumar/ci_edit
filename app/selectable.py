@@ -115,23 +115,28 @@ class Selectable(BaseLineBuffer):
     if selectionMode == kSelectionAll:
       lines = self.lines[:]
     elif selectionMode == kSelectionBlock:
-      for i in range(upperRow, lowerRow+1):
+      for i in range(upperRow, lowerRow + 1):
         lines.append(self.lines[i][upperCol:lowerCol])
     elif (selectionMode == kSelectionCharacter or
+        selectionMode == kSelectionLine or
         selectionMode == kSelectionWord):
       if upperRow == lowerRow:
         lines.append(self.lines[upperRow][upperCol:lowerCol])
       else:
-        for i in range(upperRow, lowerRow+1):
+        for i in range(upperRow, lowerRow + 1):
           if i == upperRow:
             lines.append(self.lines[i][upperCol:])
           elif i == lowerRow:
             lines.append(self.lines[i][:lowerCol])
           else:
             lines.append(self.lines[i])
-    elif selectionMode == kSelectionLine:
-      for i in range(upperRow, lowerRow+1):
-        lines.append(self.lines[i])
+    #elif selectionMode == kSelectionLine:
+    #  for i in range(upperRow, lowerRow + 1):
+    #    lines.append(self.lines[i])
+    elif selectionMode == kSelectionNone:
+      pass
+    else:
+      assert False, selectionMode
     return tuple(lines)
 
   def doDeleteSelection(self):
@@ -139,15 +144,17 @@ class Selectable(BaseLineBuffer):
     self.doDelete(upperRow, upperCol, lowerRow, lowerCol)
 
   def doDelete(self, upperRow, upperCol, lowerRow, lowerCol):
+    app.log.info(upperRow, upperCol, lowerRow, lowerCol, self.selectionMode)
     if self.upperChangedRow > upperRow:
       self.upperChangedRow = upperRow
     if self.selectionMode == kSelectionBlock:
-      for i in range(upperRow, lowerRow+1):
+      for i in range(upperRow, lowerRow + 1):
         line = self.lines[i]
         self.lines[i] = line[:upperCol] + line[lowerCol:]
     elif (self.selectionMode == kSelectionNone or
         self.selectionMode == kSelectionAll or
         self.selectionMode == kSelectionCharacter or
+        self.selectionMode == kSelectionLine or
         self.selectionMode == kSelectionWord):
       if upperRow == lowerRow and len(self.lines) > 1:
         line = self.lines[upperRow]
@@ -161,11 +168,11 @@ class Selectable(BaseLineBuffer):
         self.lines[upperRow] = (self.lines[upperRow][:upperCol] +
             self.lines[lowerRow][lowerCol:])
         upperRow += 1
-        del self.lines[upperRow:lowerRow+1]
-    elif self.selectionMode == kSelectionLine:
-      if lowerRow+1 == len(self.lines):
-        self.lines.append('')
-      del self.lines[upperRow:lowerRow+1]
+        del self.lines[upperRow:lowerRow + 1]
+    #elif self.selectionMode == kSelectionLine:
+    #  #if lowerRow + 1 == len(self.lines):
+    #  #  self.lines.append('')
+    #  del self.lines[upperRow:lowerRow + 1]
 
   def insertLines(self, lines):
     self.insertLinesAt(self.penRow, self.penCol, lines,
@@ -183,6 +190,7 @@ class Selectable(BaseLineBuffer):
       self.upperChangedRow = row
     if (selectionMode == kSelectionNone or
         selectionMode == kSelectionCharacter or
+        selectionMode == kSelectionLine or
         selectionMode == kSelectionWord):
       lines.reverse()
       firstLine = self.lines[row]
@@ -202,14 +210,14 @@ class Selectable(BaseLineBuffer):
         self.lines[row+i] = (
             self.lines[row+i][:col] + line +
             self.lines[row+i][col:])
-    elif selectionMode == kSelectionLine:
-      app.log.detail('insertLines', row, len(lines))
-      lines.reverse()
-      if (row == len(self.lines)-1 and
-          len(self.lines[-1]) == 0):
-        self.lines = self.lines[:-1]
-      for line in lines:
-        self.lines.insert(row, line)
+    #elif selectionMode == kSelectionLine:
+    #  app.log.detail('insertLines', row, len(lines))
+    #  lines.reverse()
+    #  if (row == len(self.lines)-1 and
+    #      len(self.lines[-1]) == 0):
+    #    self.lines = self.lines[:-1]
+    #  for line in lines:
+    #    self.lines.insert(row, line)
     else:
       app.log.info('selection mode not recognized', selectionMode)
 
@@ -296,6 +304,8 @@ class Selectable(BaseLineBuffer):
       upperCol = 0
       lowerRow = max(self.markerRow, self.penRow)
       lowerCol = 0
+      #if lowerRow + 1 == len(self.lines):
+      #  lowerCol = len(self.lines[lowerRow])
     elif self.selectionMode == kSelectionWord:
       upperRow = self.markerRow
       upperCol = self.markerCol

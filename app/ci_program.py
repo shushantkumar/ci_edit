@@ -240,6 +240,7 @@ class CiProgram:
 
   def executeCommandList(self, cmdList):
     for cmd, eventInfo in cmdList:
+      app.log.info(cmd, app.curses_util.cursesKeyName(cmd) or 'UNKNOWN')
       if cmd == curses.KEY_RESIZE:
         self.handleScreenResize(self.focusedWindow)
         continue
@@ -365,6 +366,10 @@ class CiProgram:
     self.debugWindow.writeLine(
         "bState %s %d"
         %(app.curses_util.mouseButtonName(bState), bState),
+            color)
+    self.debugWindow.writeLine(
+        "startAndEnd %r"
+        %(textBuffer.startAndEnd(),),
             color)
 
   def debugUndoDraw(self, win):
